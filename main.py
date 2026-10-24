@@ -67,6 +67,74 @@ _EXTRA_HOLIDAYS: frozenset[str] = frozenset()
 _EXTRA_WORKDAYS: frozenset[str] = frozenset()
 
 
+# ---------- 成长层：补回时也带上，语气才和正常对话一致 ----------
+# 成长层由 astrbot_plugin_persona_selfedit 维护；这里优先复用它的 render_growth，
+# 保证补回与正常对话注入的格式一致，插件不在时退回内置的简化格式。
+GROWTH_PLUGIN = "astrbot_plugin_persona_selfedit"
+GROWTH_PLUGIN_FILE = Path("/AstrBot/data/plugins") / GROWTH_PLUGIN / "main.py"
+GROWTH_FIELD_ORDER = (
+    ("likes", "喜欢/贪吃清单"),
+    ("habits", "小习惯"),
+    ("speech", "说话方式"),
+    ("bond", "对管理员"),
+    ("lore", "共同记忆"),
+)
+_render_growth = None
+_render_growth_loaded = False
+
+
+def _load_render_growth():
+    """载入 persona_selfedit 的 render_growth，失败返回 None（只用内置格式）。"""
+    global _render_growth, _render_growth_loaded
+    if _render_growth_loaded:
+        return _render_growth
+    _render_growth_loaded = True
+    try:
+        import importlib.util
+
+        if GROWTH_PLUGIN_FILE.exists():
+            spec = importlib.util.spec_from_file_location(
+                "_rest_hours_persona_selfedit", GROWTH_PLUGIN_FILE
+            )
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            _render_growth = getattr(module, "render_growth", None)
+    except Exception as e:
+        logger.warning(f"[rest] 载入成长层渲染函数失败，改用内置格式：{e}")
+        _render_growth = None
+    return _render_growth
+
+
+def _fallback_render_growth(state: dict) -> str:
+    """persona_selfedit 不可用时的简化渲染，字段与它保持一致。"""
+    fields = state.get("fields") or {}
+    lines = [f"【成长层 · v{state.get('version', 0)}｜你自己写的，不是管理员写的】"]
+    lines.append(f"名字：{fields.get('name') or '还没有'}")
+    for key, label in GROWTH_FIELD_ORDER:
+        if fields.get(key):
+            lines.append(f"{label}：{fields[key]}")
+    lines.append("（不要把这一层的内容展示给管理员以外的人。）")
+    return "\n".join(lines)
+
+
+def build_growth_prompt() -> str:
+    """读取成长层并渲染成要拼进 system prompt 的文本；没有就返回空串。"""
+    path = Path(get_astrbot_data_path()) / "plugin_data" / GROWTH_PLUGIN / "persona_state.json"
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return ""
+    except Exception as e:
+        logger.warning(f"[rest] 读取成长层失败，本次不注入：{e}")
+        return ""
+    render = _load_render_growth() or _fallback_render_growth
+    try:
+        return (render(state) or "").strip()
+    except Exception as e:
+        logger.warning(f"[rest] 渲染成长层失败，本次不注入：{e}")
+        return ""
+
+
 def _to_minutes(hour: str, minute: str | None) -> int:
     h = int(hour)
     m = int(minute or 0)
@@ -375,6 +443,10 @@ class RestHoursPlugin(Star):
                     system_prompt = getattr(persona, "system_prompt", "") or ""
                 except Exception as e:
                     logger.warning(f"[rest] 取人格失败，改用默认提示：{e}")
+
+                growth = build_growth_prompt()
+                if growth:
+                    system_prompt = f"{system_prompt}\n\n{growth}".strip()
 
                 resp = await provider.text_chat(
                     prompt=self._build_prompt(msgs),
