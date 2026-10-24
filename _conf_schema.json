@@ -1,0 +1,33 @@
+{
+  "rest_slots": {
+    "description": "休息时段（每行一个，可写多个）",
+    "type": "text",
+    "default": "23:00-07:00",
+    "hint": "格式 HH:MM-HH:MM；跨夜直接写 23:00-07:00；多个时段就写多行，例如再加一行 12:00-13:30。空行和 # 开头的行会被忽略。"
+  },
+  "peak_slots": {
+    "description": "高峰时段（每行一个，可写多个）",
+    "type": "text",
+    "default": "09:00-12:00\n14:00-18:00",
+    "hint": "在 peak_apply_days 指定的日子里，这些时段同样按休息处理。留空表示不启用高峰时段。"
+  },
+  "peak_apply_days": {
+    "description": "高峰时段在哪些日子生效",
+    "type": "string",
+    "default": "workday",
+    "options": ["workday", "weekday", "everyday", "never"],
+    "hint": "workday=周一到周五且非法定节假日；weekday=周一到周五（不管节假日）；everyday=每天；never=不启用。"
+  },
+  "extra_holidays": {
+    "description": "额外按节假日处理的日子",
+    "type": "text",
+    "default": "",
+    "hint": "每行一个 YYYY-MM-DD。2026 年法定节假日已内置，这里只补特殊情况（比如临时放假、公司假期）。"
+  },
+  "extra_workdays": {
+    "description": "调休上班日",
+    "type": "text",
+    "default": "",
+    "hint": "每行一个 YYYY-MM-DD。这些日子即使落在周末或节假日，也按工作日算高峰。"
+  }
+}
