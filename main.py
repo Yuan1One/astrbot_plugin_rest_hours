@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
 import re
@@ -84,23 +85,65 @@ _render_growth_loaded = False
 
 
 def _load_render_growth():
-    """载入 persona_selfedit 的 render_growth，失败返回 None（只用内置格式）。"""
+    """从 persona_selfedit 源码里**只抽出需要的函数和常量**执行，不 import 整个模块。
+
+    直接 import 那个模块会执行它模块级的 `@filter.on_llm_request()` 等装饰器，
+    把钩子注册进 AstrBot 的全局事件总线；但注册的是本进程里第二份模块实例的绑定
+    方法，别的插件（如 proactive_chat 的 dispatch_event_hook）调用时参数对不上，
+    会抛 `inject_growth_layer() missing 1 required positional argument: 'req'`。
+    2026-10-25 早上就是这么炸的，所以改成 AST 抽取，零副作用。
+    """
     global _render_growth, _render_growth_loaded
     if _render_growth_loaded:
         return _render_growth
     _render_growth_loaded = True
     try:
-        import importlib.util
+        if not GROWTH_PLUGIN_FILE.exists():
+            return None
+        source = GROWTH_PLUGIN_FILE.read_text(encoding="utf-8")
+        tree = ast.parse(source)
 
-        if GROWTH_PLUGIN_FILE.exists():
-            spec = importlib.util.spec_from_file_location(
-                "_rest_hours_persona_selfedit", GROWTH_PLUGIN_FILE
-            )
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            _render_growth = getattr(module, "render_growth", None)
+        # 顶层定义：函数 + 赋值（常量），按名字索引
+        top = {}
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                top[node.name] = node
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        top[target.id] = node
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                top[node.target.id] = node
+
+        if "render_growth" not in top:
+            return None
+
+        # 从 render_growth 出发，收集它引用到的顶层名字（递归）
+        needed: set[str] = set()
+        queue = ["render_growth"]
+        while queue:
+            name = queue.pop()
+            node = top.get(name)
+            if node is None or name in needed:
+                continue
+            needed.add(name)
+            for sub in ast.walk(node):
+                if (
+                    isinstance(sub, ast.Name)
+                    and isinstance(sub.ctx, ast.Load)
+                    and sub.id in top
+                    and sub.id not in needed
+                ):
+                    queue.append(sub.id)
+
+        body = sorted((top[name] for name in needed), key=lambda n: n.lineno)
+        module = ast.Module(body=body, type_ignores=[])
+        ast.fix_missing_locations(module)
+        namespace = {"__name__": "_rest_hours_growth_extract"}
+        exec(compile(module, str(GROWTH_PLUGIN_FILE), "exec"), namespace)
+        _render_growth = namespace.get("render_growth")
     except Exception as e:
-        logger.warning(f"[rest] 载入成长层渲染函数失败，改用内置格式：{e}")
+        logger.warning(f"[rest] 抽取成长层渲染函数失败，改用内置格式：{e}")
         _render_growth = None
     return _render_growth
 

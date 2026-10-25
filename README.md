@@ -185,6 +185,7 @@ python3 test_slots.py     # 结果：全部通过
 
 ## 十一、更新记录
 
+- **1.1.2**：成长层渲染改为从 persona_selfedit 源码 AST 抽取所需函数与常量，不再 import 整个模块，避免重复注册 on_llm_request 钩子（否则 proactive_chat 调用时报 TypeError: missing 1 required positional argument）；成长层对私聊与群聊的补回都生效
 - **1.1.1**：补回时也注入「成长层」（由 persona_selfedit 维护的名字/喜好/羁绊等），语气与正常对话一致；插件缺失时退回内置简化格式
 - **1.1.0**：时段规则配置化（`rest_slots` / `peak_slots` 支持多段、跨夜），新增 `peak_apply_days`、`extra_holidays`、`extra_workdays`，新增 `/rest` 指令，配置热重载
 - **1.0.0**：休息时段拦截 + 队列 + 休息结束补回
