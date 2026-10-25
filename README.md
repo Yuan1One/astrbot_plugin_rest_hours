@@ -8,7 +8,7 @@
 - 队列落盘，重启不丢
 - 只依赖 AstrBot 公开 API，无第三方依赖
 
-> 版本 1.1.5 ｜ 需要 AstrBot `>= 4.16, < 5`
+> 版本 1.1.6 ｜ 需要 AstrBot `>= 4.16, < 5`
 
 ---
 
@@ -172,14 +172,15 @@ astrbot_plugin_rest_hours/
 ├── main.py            # 插件主体：配置解析、时段判断、入队、补回
 ├── _conf_schema.json  # 面板配置项定义
 ├── metadata.yaml      # 插件元信息
-├── test_slots.py      # 独立自测（不依赖 AstrBot 运行时）
+├── test_slots.py      # 时段规则自测（在 AstrBot 运行环境里跑）
 └── README.md
 ```
 
-自测可直接运行，无需启动 AstrBot：
+自测脚本会 `import astrbot.api`，所以要放在 AstrBot 的运行环境里跑（脚本按自身位置找 `main.py`，不依赖安装路径）：
 
 ```bash
-python3 test_slots.py     # 结果：全部通过
+docker compose exec astrbot python3 /AstrBot/data/plugins/astrbot_plugin_rest_hours/test_slots.py
+# 结果：全部通过
 ```
 
 ---
@@ -198,6 +199,7 @@ python3 test_slots.py     # 结果：全部通过
 
 ## 十一、更新记录
 
+- **1.1.6**：修  写死安装路径的问题（改为按脚本自身位置定位 ）；README 更正自测运行方式——需在 AstrBot 运行环境内执行
 - **1.1.5**：不再写死 `/AstrBot/data`，persona_selfedit 的源码与数据路径统一由 `get_astrbot_data_path()` 推导，安装目录不同的环境也能找到成长层
 - **1.1.4**：仅文档修订——补齐成长层注入的三道前提与降级行为、故障排查条目，无功能变更
 - **1.1.3**：只有 persona_selfedit 已安装且启用时才注入成长层；未安装或已禁用时退回纯基础人设，避免用过期快照说话

@@ -1,10 +1,11 @@
 """休息时段配置的现场自测（在 astrbot 容器内跑）。"""
 
 import importlib.util
+import pathlib
 from datetime import datetime
 
-SPEC = "/AstrBot/data/plugins/astrbot_plugin_rest_hours/main.py"
-spec = importlib.util.spec_from_file_location("rest_hours", SPEC)
+SPEC = pathlib.Path(__file__).resolve().parent / "main.py"
+spec = importlib.util.spec_from_file_location("rest_hours", str(SPEC))
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 
