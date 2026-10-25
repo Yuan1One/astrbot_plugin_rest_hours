@@ -148,6 +148,28 @@ def _load_render_growth():
     return _render_growth
 
 
+def _persona_plugin_active(context) -> bool:
+    """persona_selfedit 是否已安装且处于启用状态。
+
+    未安装 → StarMetadata 为 None；已禁用 → activated 为 False。两种情况都不注入。
+    查询接口异常时按“不可用”处理并打日志，避免把成长层当成必然存在。
+    """
+    if context is None:
+        return False
+    try:
+        star = context.get_registered_star(GROWTH_PLUGIN)
+    except Exception as e:
+        logger.warning(f"[rest] 查询 {GROWTH_PLUGIN} 状态失败，本次不注入成长层：{e}")
+        return False
+    if star is None:
+        logger.info(f"[rest] 未安装 {GROWTH_PLUGIN}，本次不注入成长层")
+        return False
+    if not getattr(star, "activated", False):
+        logger.info(f"[rest] {GROWTH_PLUGIN} 已禁用，本次不注入成长层")
+        return False
+    return True
+
+
 def _fallback_render_growth(state: dict) -> str:
     """persona_selfedit 不可用时的简化渲染，字段与它保持一致。"""
     fields = state.get("fields") or {}
@@ -160,8 +182,10 @@ def _fallback_render_growth(state: dict) -> str:
     return "\n".join(lines)
 
 
-def build_growth_prompt() -> str:
-    """读取成长层并渲染成要拼进 system prompt 的文本；没有就返回空串。"""
+def build_growth_prompt(context=None) -> str:
+    """读取成长层并渲染成要拼进 system prompt 的文本；不可用或没有就返回空串。"""
+    if not _persona_plugin_active(context):
+        return ""
     path = Path(get_astrbot_data_path()) / "plugin_data" / GROWTH_PLUGIN / "persona_state.json"
     try:
         state = json.loads(path.read_text(encoding="utf-8"))
@@ -487,7 +511,7 @@ class RestHoursPlugin(Star):
                 except Exception as e:
                     logger.warning(f"[rest] 取人格失败，改用默认提示：{e}")
 
-                growth = build_growth_prompt()
+                growth = build_growth_prompt(self.context)
                 if growth:
                     system_prompt = f"{system_prompt}\n\n{growth}".strip()
 
