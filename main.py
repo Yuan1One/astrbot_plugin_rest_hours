@@ -72,7 +72,9 @@ _EXTRA_WORKDAYS: frozenset[str] = frozenset()
 # 成长层由 astrbot_plugin_persona_selfedit 维护；这里优先复用它的 render_growth，
 # 保证补回与正常对话注入的格式一致，插件不在时退回内置的简化格式。
 GROWTH_PLUGIN = "astrbot_plugin_persona_selfedit"
-GROWTH_PLUGIN_FILE = Path("/AstrBot/data/plugins") / GROWTH_PLUGIN / "main.py"
+def _growth_source_file() -> Path:
+    """persona_selfedit 的源码位置，按 AstrBot 数据目录推导，不写死容器路径。"""
+    return Path(get_astrbot_data_path()) / "plugins" / GROWTH_PLUGIN / "main.py"
 GROWTH_FIELD_ORDER = (
     ("likes", "喜欢/贪吃清单"),
     ("habits", "小习惯"),
@@ -98,9 +100,9 @@ def _load_render_growth():
         return _render_growth
     _render_growth_loaded = True
     try:
-        if not GROWTH_PLUGIN_FILE.exists():
+        if not _growth_source_file().exists():
             return None
-        source = GROWTH_PLUGIN_FILE.read_text(encoding="utf-8")
+        source = _growth_source_file().read_text(encoding="utf-8")
         tree = ast.parse(source)
 
         # 顶层定义：函数 + 赋值（常量），按名字索引
@@ -140,7 +142,7 @@ def _load_render_growth():
         module = ast.Module(body=body, type_ignores=[])
         ast.fix_missing_locations(module)
         namespace = {"__name__": "_rest_hours_growth_extract"}
-        exec(compile(module, str(GROWTH_PLUGIN_FILE), "exec"), namespace)
+        exec(compile(module, str(_growth_source_file()), "exec"), namespace)
         _render_growth = namespace.get("render_growth")
     except Exception as e:
         logger.warning(f"[rest] 抽取成长层渲染函数失败，改用内置格式：{e}")
