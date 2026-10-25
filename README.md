@@ -8,7 +8,7 @@
 - 队列落盘，重启不丢
 - 只依赖 AstrBot 公开 API，无第三方依赖
 
-> 版本 1.1.6 ｜ 需要 AstrBot `>= 4.16, < 5`
+> 版本 1.1.2 ｜ 需要 AstrBot `>= 4.16, < 5`
 
 ---
 
@@ -199,11 +199,7 @@ docker compose exec astrbot python3 /AstrBot/data/plugins/astrbot_plugin_rest_ho
 
 ## 十一、更新记录
 
-- **1.1.6**：修  写死安装路径的问题（改为按脚本自身位置定位 ）；README 更正自测运行方式——需在 AstrBot 运行环境内执行
-- **1.1.5**：不再写死 `/AstrBot/data`，persona_selfedit 的源码与数据路径统一由 `get_astrbot_data_path()` 推导，安装目录不同的环境也能找到成长层
-- **1.1.4**：仅文档修订——补齐成长层注入的三道前提与降级行为、故障排查条目，无功能变更
-- **1.1.3**：只有 persona_selfedit 已安装且启用时才注入成长层；未安装或已禁用时退回纯基础人设，避免用过期快照说话
-- **1.1.2**：成长层渲染改为从 persona_selfedit 源码 AST 抽取所需函数与常量，不再 import 整个模块，避免重复注册 on_llm_request 钩子（否则 proactive_chat 调用时报 TypeError: missing 1 required positional argument）；成长层对私聊与群聊的补回都生效
+- **1.1.2**：成长层注入的健壮性与可移植性收尾——成长层渲染改为从 `persona_selfedit` 源码 AST 抽取所需函数与常量，不再 import 整个模块（避免重复注册 `on_llm_request` 钩子，否则 proactive_chat 调用时报 `TypeError: missing 1 required positional argument`）；只有该插件已安装且启用时才注入，未安装或已禁用就退回纯基础人设，不会用过期快照说话；路径统一由 `get_astrbot_data_path()` 推导，不再写死 `/AstrBot/data`，装到别的目录也能找到成长层；`test_slots.py` 改为按脚本自身位置定位 `main.py`；README 补齐成长层注入的三道前提、降级行为、故障排查条目与自测运行方式（需在 AstrBot 运行环境内执行）
 - **1.1.1**：补回时也注入「成长层」（由 persona_selfedit 维护的名字/喜好/羁绊等），语气与正常对话一致；插件缺失时退回内置简化格式
 - **1.1.0**：时段规则配置化（`rest_slots` / `peak_slots` 支持多段、跨夜），新增 `peak_apply_days`、`extra_holidays`、`extra_workdays`，新增 `/rest` 指令，配置热重载
 - **1.0.0**：休息时段拦截 + 队列 + 休息结束补回
